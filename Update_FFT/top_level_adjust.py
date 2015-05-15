@@ -11,7 +11,7 @@ def main(argv):
    missing_ports = []
    write_ports = []
    port_found = 0
-   NUM_OF_SLOTS = 8
+   NUM_OF_SLOTS = 0
 
    #Read arguments from python run
    try:
@@ -48,7 +48,9 @@ def main(argv):
          if("system_" not in mod_name):
             mod_name = "system_" + mod_name
          #Need to remove module count from name 
-         if "top" not in line:
+         if "top" not in line and any(i.isdigit() for i in mod_name[-4:]):
+            #DEBUG: Tracks the module name 
+            #print(mod_name)
             mod_name = mod_name[:-4]
          mod_begin_index = mod_list.index(line)
          #DEBUG - Determine start index for module definition
@@ -81,15 +83,20 @@ def main(argv):
 
    #Find the top module name in the top level design
    for line in top_list:
-      if mod_name in line:
-         #DEBUG - Determine the names of the module instantiations in top level design
-         #print(line)
-         fp_store_mods.write(line.split(' ')[1])
-         top_mod_indicies.append(top_list.index(line))
+        if mod_name in line.split(' ')[0]:
+            test_line = line.split(' ')[0]
+            if len(mod_name) >= (len(test_line) - 4):
+                #DEBUG - Determine the names of the module instantiations in top level design
+                #print(test_line)
+                #print(mod_name)
+                fp_store_mods.write(line.split(' ')[1])
+                top_mod_indicies.append(top_list.index(line))
+                NUM_OF_SLOTS = NUM_OF_SLOTS + 1
    #DEBUG - Determine the Module base name
    #print(mod_name)
    #print(top_mod_indicies)
-
+   #print(NUM_OF_SLOTS)
+   #print(top_mod_indicies)
    #DEBUG
    #i = 0
 
@@ -126,43 +133,48 @@ def main(argv):
    mod_insts = []
 
    #DEBUG
-   #print(missing_ports)
+   print(missing_ports)
 
    for line in it:
       # Get all the ports available in the top level design for the RM
       # Write everything else in top level design to new file
-      if mod_name in line:
-         mod_insts.append(line.split(' ', 1)[0])
-         fp_top_modified.write(line)
-         fp_top_modified.write("(")
-         top_mod_ports = next(it).strip('\n')
-         top_mod_ports = top_mod_ports.replace("(", '', 1)
-         #DEBUG
-         #print(top_mod_ports)
-         while top_mod_ports[-2:] != ");":
-            write_ports.append(top_mod_ports)
+      if mod_name in line.split(' ')[0]:
+         test_line = line.split(' ')[0]
+         if len(mod_name) >= (len(test_line) - 4):
+            print(line)
+            mod_insts.append(line.split(' ', 1)[0])
+            fp_top_modified.write(line)
+            fp_top_modified.write("(")
             top_mod_ports = next(it).strip('\n')
-         write_ports.append(top_mod_ports[:-2] + ',')
-         #Put ports in the correct order and add missing ports
-         for mod_ports in all_mod_ports:
-            for ports in write_ports:
-               if mod_ports in ports:
-                  #Check if this is the last port
-                  if mod_ports == all_mod_ports[-1]:
-                     ports = ports.replace(',', '')
-                  fp_top_modified.write(ports + '\n')
-                  port_found = 1
-                  break
-            if port_found == 0:
-               if mod_ports != all_mod_ports[-1]:
-                  fp_top_modified.write('        .' + mod_ports + '(' + mod_ports + str(mod_count) + '),\n')
+            top_mod_ports = top_mod_ports.replace("(", '', 1)
+            #DEBUG
+            #print(top_mod_ports)
+            while top_mod_ports[-2:] != ");":
+               write_ports.append(top_mod_ports)
+               top_mod_ports = next(it).strip('\n')
+            write_ports.append(top_mod_ports[:-2] + ',')
+            #Put ports in the correct order and add missing ports
+            for mod_ports in all_mod_ports:
+               for ports in write_ports:
+                  if mod_ports in ports:
+                     #Check if this is the last port
+                     if mod_ports == all_mod_ports[-1]:
+                        ports = ports.replace(',', '')
+                     fp_top_modified.write(ports + '\n')
+                     port_found = 1
+                     break
+               if port_found == 0:
+                  if mod_ports != all_mod_ports[-1]:
+                     fp_top_modified.write('        .' + mod_ports + '(' + mod_ports + str(mod_count) + '),\n')
+                  else:
+                     fp_top_modified.write('        .' + mod_ports + '(' + mod_ports + str(mod_count) + ')\n')
                else:
-                  fp_top_modified.write('        .' + mod_ports + '(' + mod_ports + str(mod_count) + ')\n')
-            else:
-               port_found = 0
-         del write_ports[:]
-         fp_top_modified.write(');\n')
-         mod_count += 1
+                  port_found = 0
+            del write_ports[:]
+            fp_top_modified.write(');\n')
+            mod_count += 1
+         else:
+            fp_top_modified.write(line)
       else:
          if 'wire' in line and not printed_ports:
             for x in range(0,NUM_OF_SLOTS):
